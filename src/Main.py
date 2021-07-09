@@ -1,4 +1,4 @@
-import lexer
+import JackTokenizer as lexer
 
 class JackCompiler:
     def __init__(self):
