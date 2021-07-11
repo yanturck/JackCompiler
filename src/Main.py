@@ -11,18 +11,7 @@ class JackCompiler:
         while (self.lexer.hasMoreTokens() == True):
             self.lexer.advance()
             token = self.lexer.getToken()
-            tokenType = self.lexer.tokenType(token)
-            
-            if (token == '&'): # substituindo simbolo
-                self.rname.write('<'+tokenType+'> ' + '&amp;' + ' </'+tokenType+'>\n')
-            elif (token == '>'): # substituindo simbolo
-                self.rname.write('<'+tokenType+'> ' + '&gt;' + ' </'+tokenType+'>\n')
-            elif (token == '<'): # substituindo simbolo
-                self.rname.write('<'+tokenType+'> ' + '&lt;' + ' </'+tokenType+'>\n')
-            elif (tokenType == 'stringConst'):
-                self.rname.write('<'+tokenType+'> ' + token[1:len(token)-1] + ' </'+tokenType+'>\n')
-            else:
-                self.rname.write('<'+tokenType+'> ' + token + ' </'+tokenType+'>\n')
+            self.rname.write(self.lexer.tagToken(token))
 
         self.rname.write('</tokens>')
         self.rname.close()

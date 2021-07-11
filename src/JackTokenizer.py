@@ -40,3 +40,16 @@ class JackTokenizer:
             return 'integerConstant'
         else:
             return 'identifier'
+
+    def tagToken(self, token):
+        tokenT = self.tokenType(token)
+        if (token == '&'): # substituindo simbolo
+            return('<'+tokenT+'> ' + '&amp;' + ' </'+tokenT+'>\n')
+        elif (token == '>'): # substituindo simbolo
+            return('<'+tokenT+'> ' + '&gt;' + ' </'+tokenT+'>\n')
+        elif (token == '<'): # substituindo simbolo
+            return('<'+tokenT+'> ' + '&lt;' + ' </'+tokenT+'>\n')
+        elif (tokenT == 'stringConst'):
+            return('<'+tokenT+'> ' + token[1:len(token)-1] + ' </'+tokenT+'>\n')
+        else:
+            return('<'+tokenT+'> ' + token + ' </'+tokenT+'>\n')
