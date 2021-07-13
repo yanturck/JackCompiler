@@ -1,4 +1,6 @@
+# from _typeshed import Self
 from re import escape
+import re
 import JackTokenizer as lexer
 
 class CompilationEngine:
@@ -7,7 +9,6 @@ class CompilationEngine:
         self.tokenC = ''
         self.tagToken = ''
         self.tokenT = ''
-        self.nextToken()
 
     def nextToken(self):
         if (self.jt.hasMoreTokens()):
@@ -19,9 +20,8 @@ class CompilationEngine:
         #     print('Acabou os Tokens!')
 
     def compile(self):
-        # self.nextToken()
-        # self.compileClass()
-        return self.compileVarDec()
+        self.nextToken()
+        self.compileClass()
 
     def esperado(self, token): # Comparando o Token Esperado com o Corrente
         # try:
@@ -35,9 +35,10 @@ class CompilationEngine:
         result = self.tagTerminal('class')
         result += self.esperado('class')
         self.nextToken()
-        result += self.jt.tokenType # identificador da classe
+        result += self.tagToken # identificador da classe
         self.nextToken()
         result += self.esperado('{')
+        self.nextToken()
         result += self.compileClassVarDec()
         result += self.compileSubRoutine()
         result += self.esperado('}')
@@ -45,7 +46,21 @@ class CompilationEngine:
         return result
 
     def compileClassVarDec(self): # Compila uma declaração estática(Static) ou uma declaração de campo(Field)
-        result = ""
+        result = ''
+        vars = ['field', 'static']
+        
+        if self.tokenC in vars:
+            result += self.tagTerminal('classVarDec')
+            result += self.esperado(self.tokenC)
+            self.nextToken()
+            result += self.compileType()
+            self.nextToken()
+            result += self.tagToken # identificador
+            self.nextToken()
+            result += self.compileListId()
+            result += self.untagTerminal('classVarDec')
+            self.nextToken()
+            result += self.compileVarDec()
 
         return result
 
@@ -53,6 +68,8 @@ class CompilationEngine:
         types = ['int', 'char', 'boolean', 'void']
         if self.tokenC in types:
             return self.esperado(self.tokenC)
+        elif (self.tokenT == 'identifier'):
+            return self.tagToken
 
     def compileListId(self):
         result = ''
@@ -89,8 +106,41 @@ class CompilationEngine:
 
         return result
 
-    def compileSubRoutine(): # Compila um método, função ou construtor completo
-        return 0
+    def compileSubRoutine(self): # Compila um método, função ou construtor completo
+        result = ''
+        subRoutines = ['constructor', 'function', 'method']
+
+        if self.tokenC in subRoutines:
+            result += self.tagTerminal('subroutineDec')
+            result += self.tagToken
+            self.nextToken()
+            result += self.compileType()
+            self.nextToken()
+            result += self.tagToken # identificador
+            self.nextToken()
+            result += self.esperado('(')
+            self.nextToken()
+            result += self.tagTerminal('parameterList')
+            result += self.compileParameterList()
+            result += self.untagTerminal('parameterList')
+            result += self.esperado(')')
+            self.nextToken()
+            result += self.compileSubRoutineBody()
+            result += self.tagTerminal('subroutineDec')
+            result += self.compileSubRoutine()
+
+        return result
+
+    def compileSubRoutineBody(self):
+        result = self.tagTerminal('subroutineBody')
+        result += self.esperado('{')
+        self.nextToken()
+        result += self.compileVarDec()
+        result += self.compileStatements()
+        result += self.esperado('}')
+        self.nextToken()
+        result += self.untagTerminal('subroutineBody')
+        return result
 
     def compileSubRoutineCall(self):
         result = self.tagTerminal('subroutineCall')
@@ -118,10 +168,21 @@ class CompilationEngine:
         result += self.untagTerminal('subroutineCall')
         return result
 
-    def compileParameterList(): # Compila uma lista de parâmetros (possivelmente vazia), sem incluir o caractere "()"
-        return 0
+    def compileParameterList(self): # Compila uma lista de parâmetros (possivelmente vazia), sem incluir o caractere "()"
+        result = ''
 
-    
+        if (self.tokenC == ','):
+            result += self.esperado(',')
+            self.nextToken()
+            result += self.compileParameterList()
+        elif (self.tokenT == 'identifier' or self.tokenT == 'keyword'):
+            result += self.compileType()
+            self.nextToken()
+            result += self.tagToken # identificador
+            self.nextToken()
+            result += self.compileParameterList()
+
+        return result    
 
     def compileStatement(self): # Compila uma declaração, sem incluir o delimitador ‘‘ {} ’’
         result = ''
@@ -315,5 +376,32 @@ class CompilationEngine:
     def untagTerminal(self, tag):
         return '</' + tag + '>\n'
 
-cp = CompilationEngine('// Location on the screen\nfield int x, y;\n// The size of the square\nfield int size;\\static boolean v, f;')
+cp = CompilationEngine("""// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/10/ExpressionLessSquare/Main.jack
+
+/** Expressionless version of projects/10/Square/Main.jack. */
+
+class Main {
+    static boolean test;    // Added for testing -- there is no static keyword
+                            // in the Square files.
+
+    function void main() {
+        var SquareGame game;
+        let game = game;
+        do game.run();
+        do game.dispose();
+        return;
+    }
+
+    function void more() {  // Added to test Jack syntax that is not used in
+        var boolean b;      // the Square files.
+        if (b) {
+        }
+        else {              // There is no else keyword in the Square files.
+        }
+        return;
+    }
+}""")
 print(cp.compile())
