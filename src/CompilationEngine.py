@@ -1,6 +1,3 @@
-# from _typeshed import Self
-from re import escape
-import re
 import JackTokenizer as lexer
 
 class CompilationEngine:
@@ -16,21 +13,18 @@ class CompilationEngine:
             self.tokenC = self.jt.getToken()
             self.tokenT = self.jt.tokenType(self.tokenC)
             self.tagToken = self.jt.tagToken(self.tokenC)
-        # else:
-        #     print('Acabou os Tokens!')
 
     def compile(self):
         self.nextToken()
-        self.compileClass()
+        return self.compileClass()
 
     def esperado(self, token): # Comparando o Token Esperado com o Corrente
-        # try:
         if (self.tokenC == token):
             return self.jt.tagToken(token)
-        # except Exception:
-        #     ("expected: " + token + " found: " + self.tokenC)
-            
-    # Cria um novo mecanismo de compilação com a entrada e saída fornecidas. A próxima rotina chamada deve ser compileClass
+
+    # Estrutura do Programa ========================================================================
+
+    # 'class' className '{' classVarDec* subroutineDec* '}'
     def compileClass(self): # Compila uma classe completa
         result = self.tagTerminal('class')
         result += self.esperado('class')
@@ -45,6 +39,7 @@ class CompilationEngine:
         result += self.untagTerminal('class')
         return result
 
+    # ( 'static' | 'field' ) type varName ( ',' varName)* ';'
     def compileClassVarDec(self): # Compila uma declaração estática(Static) ou uma declaração de campo(Field)
         result = ''
         vars = ['field', 'static']
@@ -60,10 +55,11 @@ class CompilationEngine:
             result += self.compileListId()
             result += self.untagTerminal('classVarDec')
             self.nextToken()
-            result += self.compileVarDec()
+            result += self.compileClassVarDec()
 
         return result
 
+    # int' | 'char' | 'boolean' | className
     def compileType(self):
         types = ['int', 'char', 'boolean', 'void']
         if self.tokenC in types:
@@ -71,41 +67,7 @@ class CompilationEngine:
         elif (self.tokenT == 'identifier'):
             return self.tagToken
 
-    def compileListId(self):
-        result = ''
-
-        if (self.tokenT == 'identifier'):
-            result += self.tagToken
-            self.nextToken()
-            result += self.compileListId()
-        elif (self.tokenC == ','):
-            result += self.esperado(',')
-            self.nextToken()
-            result += self.compileListId()
-        elif (self.tokenC == ';'):
-            result += self.esperado(';')
-
-        return result
-
-    def compileVarDec(self): # Compila uma declaração var
-        result = ''
-        vars = ['field', 'static']
-        
-        if self.tokenC in vars:
-            result += self.tagTerminal('varDec')
-            result += self.esperado(self.tokenC)
-            self.nextToken()
-            result += self.compileType()
-            self.nextToken()
-            result += self.tagToken # identificador
-            self.nextToken()
-            result += self.compileListId()
-            result += self.untagTerminal('varDec')
-            self.nextToken()
-            result += self.compileVarDec()
-
-        return result
-
+    # ( 'constructor' | 'function' | 'method' ) ( 'void' | type) subroutineName '(' parameterList ')' subroutineBody
     def compileSubRoutine(self): # Compila um método, função ou construtor completo
         result = ''
         subRoutines = ['constructor', 'function', 'method']
@@ -126,48 +88,12 @@ class CompilationEngine:
             result += self.esperado(')')
             self.nextToken()
             result += self.compileSubRoutineBody()
-            result += self.tagTerminal('subroutineDec')
+            result += self.untagTerminal('subroutineDec')
             result += self.compileSubRoutine()
 
         return result
 
-    def compileSubRoutineBody(self):
-        result = self.tagTerminal('subroutineBody')
-        result += self.esperado('{')
-        self.nextToken()
-        result += self.compileVarDec()
-        result += self.compileStatements()
-        result += self.esperado('}')
-        self.nextToken()
-        result += self.untagTerminal('subroutineBody')
-        return result
-
-    def compileSubRoutineCall(self):
-        result = self.tagTerminal('subroutineCall')
-        result += self.tagToken # SubRoutineName
-        self.nextToken()
-
-        if (self.tokenC == '('):
-            result += self.esperado('(')
-            self.nextToken()
-            result += self.tagTerminal('expressionList')
-            result += self.compileExpressionList()
-            result += self.untagTerminal('expressionList')
-            result += self.esperado(')')
-        elif (self.tokenC == '.'):
-            result += self.esperado('.')
-            self.nextToken()
-            result += self.tagToken # SubRoutineName
-            self.nextToken()
-            result += self.esperado('(')
-            self.nextToken()
-            result += self.compileExpressionList()
-            result += self.esperado(')')
-
-        self.nextToken()
-        result += self.untagTerminal('subroutineCall')
-        return result
-
+    # ((type varName) ( ',' type varName)*)?
     def compileParameterList(self): # Compila uma lista de parâmetros (possivelmente vazia), sem incluir o caractere "()"
         result = ''
 
@@ -182,8 +108,65 @@ class CompilationEngine:
             self.nextToken()
             result += self.compileParameterList()
 
-        return result    
+        return result
 
+    # '{' varDec* statements '}'
+    def compileSubRoutineBody(self):
+        result = self.tagTerminal('subroutineBody')
+        result += self.esperado('{')
+        self.nextToken()
+        result += self.compileVarDec()
+        result += self.compileStatements()
+        result += self.esperado('}')
+        self.nextToken()
+        result += self.untagTerminal('subroutineBody')
+        return result
+
+    # 'var' type varName ( ',' varName)* ';'
+    def compileVarDec(self): # Compila uma declaração var
+        result = ''
+
+        if (self.tokenC == 'var'):
+            result += self.tagTerminal('varDec')
+            result += self.esperado(self.tokenC)
+            self.nextToken()
+            result += self.compileType()
+            self.nextToken()
+            result += self.tagToken # identificador
+            self.nextToken()
+            result += self.compileListId()
+            result += self.untagTerminal('varDec')
+            self.nextToken()
+            result += self.compileVarDec()
+
+        return result
+
+    def compileListId(self):
+        result = ''
+
+        if (self.tokenT == 'identifier'):
+            result += self.tagToken
+            self.nextToken()
+            result += self.compileListId()
+        elif (self.tokenC == ','):
+            result += self.esperado(',')
+            self.nextToken()
+            result += self.compileListId()
+        elif (self.tokenC == ';'):
+            result += self.esperado(';')
+
+        return result
+
+    # Statements ========================================================================
+    
+    # statement*
+    def compileStatements(self): # Compila uma sequência de declarações, sem incluir o delimitador ‘‘ {} ’’
+        result = self.tagTerminal('statements')
+        result += self.compileStatement()
+        result += self.untagTerminal('statements')
+        return result
+
+    # letStatement | ifStatement | whileStatement | doStatement | returnStatement
     def compileStatement(self): # Compila uma declaração, sem incluir o delimitador ‘‘ {} ’’
         result = ''
 
@@ -191,7 +174,7 @@ class CompilationEngine:
             result += self.compileLetStatement()
             result += self.compileStatement()
         elif (self.tokenC == 'if'):
-            result += self.compileIftStatement()
+            result += self.compileIfStatement()
             result += self.compileStatement()
         elif (self.tokenC == 'while'):
             result += self.compileWhileStatement()
@@ -205,22 +188,7 @@ class CompilationEngine:
 
         return result
 
-    def compileStatements(self): # Compila uma sequência de declarações, sem incluir o delimitador ‘‘ {} ’’
-        result = self.tagTerminal('statements')
-        result += self.compileStatement()
-        result += self.untagTerminal('statements')
-        return result
-
-    def compileDoStatement(self): # Compila uma instrução do
-        result = self.tagTerminal('doStatement')
-        result += self.esperado('do')
-        self.nextToken()
-        result += self.compileSubRoutine()
-        result += self.esperado(';')
-        self.nextToken()
-        result += self.untagTerminal('doStatement')
-        return 0
-
+    # 'let' varName ( '[' expression ']' )? '=' expression ';'
     def compileLetStatement(self): # Compila uma instrução let
         result = self.tagTerminal('letStatement')
         result += self.esperado('let')
@@ -243,19 +211,7 @@ class CompilationEngine:
         result += self.untagTerminal('letStatement')
         return result
 
-    def compileReturnStatement(self): # Compila uma instrução return
-        result = self.tagTerminal('returnStatement')
-        result += self.esperado('return')
-        self.nextToken()
-
-        if (self.tokenC != ';'):
-            result += self.compileExpression()
-
-        result += self.esperado(';')
-        self.nextToken()
-        result += self.untagTerminal('returnStatement')
-        return result
-
+    # 'if' '(' expression ')' '{' statements '}' ( 'else' '{' statements '}' )?
     def compileIfStatement(self): # Compila uma instrução if, possivelmente com uma cláusula else à direita
         result = self.tagTerminal('ifStatement')
         result += self.esperado('if')
@@ -283,6 +239,7 @@ class CompilationEngine:
         result += self.untagTerminal('ifStatement')
         return result
 
+    # 'while' '(' expression ')' '{' statements '}'
     def compileWhileStatement(self):
         result = self.tagTerminal('whileStatement')
         result += self.esperado('while')
@@ -300,6 +257,34 @@ class CompilationEngine:
         result += self.untagTerminal('whileStatement')
         return result
 
+    # 'do' subroutineCall ';'
+    def compileDoStatement(self): # Compila uma instrução do
+        result = self.tagTerminal('doStatement')
+        result += self.esperado('do')
+        self.nextToken()
+        result += self.compileSubRoutineCall()
+        result += self.esperado(';')
+        self.nextToken()
+        result += self.untagTerminal('doStatement')
+        return result
+
+    # 'return' expression? ';'
+    def compileReturnStatement(self): # Compila uma instrução return
+        result = self.tagTerminal('returnStatement')
+        result += self.esperado('return')
+        self.nextToken()
+
+        if (self.tokenC != ';'):
+            result += self.compileExpression()
+
+        result += self.esperado(';')
+        self.nextToken()
+        result += self.untagTerminal('returnStatement')
+        return result
+
+    # Expressions ========================================================================
+    
+    # term (op term)*
     def compileExpression(self): # Compila uma expressão
         result = self.tagTerminal('expression')
         result += self.compileTerm()
@@ -307,6 +292,7 @@ class CompilationEngine:
         result += self.untagTerminal('expression')
         return result
 
+    # integerConstant | stringConstant | keywordConstant | varName | varName '[' expression ']' | subroutineCall | '(' expression ')' | unaryOp term
     def compileTerm(self):
         """Compila um termo.
         Essa rotina enfrenta uma pequena dificuldade ao tentar decidir entre algumas das regras alternativas de análise.
@@ -348,6 +334,50 @@ class CompilationEngine:
         result += self.untagTerminal('term')
         return result
 
+    # subroutineName '(' expressionList ')' | (className|varName) '.' subroutineName '(' expressionList ')'
+    def compileSubRoutineCall(self):
+        # result = self.tagTerminal('subroutineCall')
+        result = self.tagToken # SubRoutineName
+        self.nextToken()
+
+        if (self.tokenC == '('):
+            result += self.esperado('(')
+            self.nextToken()
+            result += self.tagTerminal('expressionList')
+            result += self.compileExpressionList()
+            result += self.untagTerminal('expressionList')
+            result += self.esperado(')')
+        elif (self.tokenC == '.'):
+            result += self.esperado('.')
+            self.nextToken()
+            result += self.tagToken # SubRoutineName
+            self.nextToken()
+            result += self.esperado('(')
+            self.nextToken()
+            result += self.tagTerminal('expressionList')
+            result += self.compileExpressionList()
+            result += self.untagTerminal('expressionList')
+            result += self.esperado(')')
+
+        self.nextToken()
+        # result += self.untagTerminal('subroutineCall')
+        return result
+
+    # (expression ( ',' expression)* )?
+    def compileExpressionList(self): # Compila uma lista de expressões (possivelmente vazia) separada por vírgulas
+        if (self.tokenC == ')'):
+            return ''
+        else:
+            result = self.compileExpression()
+
+            if (self.tokenC == ','):
+                result += self.esperado(',')
+                self.nextToken()
+                result += self.compileExpressionList()
+
+            return result
+
+    # '+' | '-' | '* | '/' | '&' | '|' | '<' | '>' | '='
     def compileOp(self):
         result = ''
         simbolos = ['+', '*', '/', '&', '|', '<', '>', '=']
@@ -360,48 +390,13 @@ class CompilationEngine:
 
         return result
 
-    def compileExpressionList(self): # Compila uma lista de expressões (possivelmente vazia) separada por vírgulas
-        result = self.compileExpression()
+    # '-' | '~'
+    # def compileUnaryOp():
 
-        if (self.tokenC == ','):
-            result += self.esperado(',')
-            self.nextToken()
-            result += self.compileExpressionList()
-
-        return result
-
+    # 'true | 'false' | 'null' | 'this'
+    # def compileKeywordConstant
     
     def tagTerminal(self, tag):
         return '<' + tag + '>\n'
     def untagTerminal(self, tag):
         return '</' + tag + '>\n'
-
-cp = CompilationEngine("""// This file is part of www.nand2tetris.org
-// and the book "The Elements of Computing Systems"
-// by Nisan and Schocken, MIT Press.
-// File name: projects/10/ExpressionLessSquare/Main.jack
-
-/** Expressionless version of projects/10/Square/Main.jack. */
-
-class Main {
-    static boolean test;    // Added for testing -- there is no static keyword
-                            // in the Square files.
-
-    function void main() {
-        var SquareGame game;
-        let game = game;
-        do game.run();
-        do game.dispose();
-        return;
-    }
-
-    function void more() {  // Added to test Jack syntax that is not used in
-        var boolean b;      // the Square files.
-        if (b) {
-        }
-        else {              // There is no else keyword in the Square files.
-        }
-        return;
-    }
-}""")
-print(cp.compile())
