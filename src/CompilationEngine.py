@@ -394,7 +394,14 @@ class CompilationEngine:
     # def compileUnaryOp():
 
     # 'true | 'false' | 'null' | 'this'
-    # def compileKeywordConstant
+    def compileKeywordConstant(self):
+        types = ['true', 'false', 'null', 'this']
+        result = ''
+
+        if self.tokenC in types:
+            result += self.esperado(self.tokenC)
+
+        return result
     
     def tagTerminal(self, tag):
         return '<' + tag + '>\n'

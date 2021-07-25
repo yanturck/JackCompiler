@@ -1,27 +1,18 @@
 import JackTokenizer as lexer
 import CompilationEngine as eng
+import os
 
 class JackCompiler:
     def __init__(self):
-        self.fname = open('Square.jack', 'r')
-        self.lname = open('SquareT.xml', 'w')
-        self.sname = open('Square.xml', 'w')
+        self.caminhos = [os.path.join('/home/yan/Documentos/Compiladores/nand2tetris/projects/10/ExpressionLessSquare/Testes', nome) for nome in os.listdir('/home/yan/Documentos/Compiladores/nand2tetris/projects/10/ExpressionLessSquare')]
+        self.arqJack = [arq for arq in self.caminhos if arq.lower().endswith(".jack")]
 
-        self.prog = self.fname.read()
+        while self.arqJack != []:
+            fpath = self.arqJack.pop()
+            fname = open(fpath, 'r')
+            sname = open(fpath[:-4] + 'xml', 'w')
 
-        self.lexer = lexer.JackTokenizer(self.prog)
-        self.sinta = eng.CompilationEngine(self.prog)
-
-        self.lname.write('<tokens>\n')
-        while (self.lexer.hasMoreTokens() == True):
-            self.lexer.advance()
-            token = self.lexer.getToken()
-            self.lname.write(self.lexer.tagToken(token))
-
-        self.lname.write('</tokens>')
-        self.lname.close()
-
-        self.sname.write(self.sinta.compile())
-        self.sname.close()
+            sinta = eng.CompilationEngine(fname.read())
+            sname.write(sinta.compile())
 
 JackCompiler()
