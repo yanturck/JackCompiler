@@ -1,18 +1,40 @@
 
 class VMCode():
+    def __init__(self):
+        self.tableSymbolClass = [] # tabela de simbolos nivel de classe
+        self.tableSymbolSR = [] # tabela de simbolos nivel subroutina
+        self.nivelClass = True # apontando o nivel
+
     # SymbolTable ==================================================
     def startSubRoutine():
     # começa um novo escopo de sub-routina (ou seja, reinicia a tabela de simbolos da subroutina)
         return 0
 
-    def define(name, type, kind): # kind = STATIC, FIELD, ARG ou VAR
+    def define(name, type, kind, self): # kind = STATIC, FIELD, ARG ou VAR
     # define um novo identificador com o name, type e kind fornecidos e atribui a ele um índice em execução
     # identificadores STATIC e FIELD tem uma escopo de classe, enquanto os identificadores ARG e VAR possuem uma escopo de subroutine
-        return 0
+        symbol = {
+            'name': name,
+            'type': type,
+            'kind': kind,
+            '#': self.varCount(kind)
+        }
+        return symbol
 
-    def varCount(kind): # kind = STATIC, FIELD, ARG ou VAR
+    def varCount(kind, self): # kind = STATIC, FIELD, ARG ou VAR
     # retorna o número de variaveis do kind dado já definido no escopo corrente
-        return 0 # retorna um inteiro
+        count = 0
+        
+        if (self.nivelClass == True):
+            for i in self.tableSymbolClass:
+                if (kind == i['kind']):
+                    count += 1
+        else:
+            for i in self.tableSymbolSR:
+                if (kind == i['kind']):
+                    count += 1
+
+        return count # retorna um inteiro
 
     def kindOf(name):
     # retorna o kind do nome do identificador no escopo corrente
