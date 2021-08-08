@@ -1,3 +1,4 @@
+from _typeshed import Self
 import re
 import VMCode as vm
 import JackTokenizer as lexer
@@ -34,29 +35,106 @@ class VMCompileEngine:
 
     def compileClass(self):
     # compila uma classe completa
-        result = ''
-
-        return 0
+        self.esperado('class')
+        self.nextToken() # tokenC = identificador da classe
+        self.nextToken()
+        self.esperado('{')
+        self.nextToken()
+        self.vm.nivel = True # nivel de classe
+        self.compileClassVarDec()
+        result = self.compileSubroutineDec()
+        self.esperado('}')
+        return result
 
     def compileClassVarDec(self):
     # compila uma variavel declarada STATIC ou declarada FIELD
-        return 0
+        vars = ['field', 'static']
+        
+        if self.tokenC in vars:
+            kind = self.tokenC
+            self.nextToken()
+            tipo = self.tokenC() # type
+            self.nextToken()
+            name = self.tokenC() # identificador
+            self.nextToken()
+            self.vm.define(name, tipo, kind)
+
+            while (self.tokenC == ','):
+                self.nextToken()
+                name = self.tokenC() # identificador
+                self.nextToken()
+                self.vm.define(name, tipo, kind)
+            
+            self.esperado(';')
+            self.nextToken()
+            self.compileVarDec()
 
     def compileSubroutineDec(self):
     # compila um metodo(METHOD), uma função(FUNCTION) ou um construtor(CONSTRUCTOR) completo
-        return 0
+        result = ''
+        subRoutines = ['constructor', 'function', 'method']
+
+        if self.tokenC in subRoutines:
+            self.vm.nivel = False # Nivel de SubRoutine
+            # tokenC = subRoutines
+            self.nextToken() # tokenC = tipo
+            result += self.tagToken
+            self.nextToken()
+            result += self.tagToken # identificador
+            self.nextToken()
+            self.esperado('(')
+            self.nextToken()
+            result += self.compileParameterList()
+            self.esperado(')')
+            self.nextToken()
+            result += self.compileSubroutineBody()
+            result += self.compileSubroutineDec()
+
+        return result
     
     def compileParameterList(self):
     # compila uma lista de parametros
-        return 0
+        types = ['int', 'char', 'boolean', 'void']
+
+        if (self.tokenC == ','):
+            self.nextToken()
+            self.compileParameterList()
+        elif(self.tokenC in types):
+            tipo = self.tokenC
+            self.nextToken()
+            name = self.tokenC
+            self.vm.define(name, tipo, 'argument')
+            self.compileParameterList()
 
     def compileSubroutineBody(self):
     # compila um corpo de subroutina
-        return 0
+        self.esperado('{')
+        self.nextToken()
+        self.compileVarDec()
+        result = self.compileStatements()
+        self.esperado('}')
+        self.nextToken()
+        return result
 
     def compileVarDec(self):
     # compila uma declaração de variavel
-        return 0
+        if (self.tokenC == 'var'):
+            self.nextToken()
+            tipo = self.tokenC() # type
+            self.nextToken()
+            name = self.tokenC() # identificador
+            self.nextToken()
+            self.vm.define(name, tipo, 'local')
+
+            while (self.tokenC == ','):
+                self.nextToken()
+                name = self.tokenC() # identificador
+                self.nextToken()
+                self.vm.define(name, tipo, 'local')
+            
+            self.esperado(';')
+            self.nextToken()
+            self.compileVarDec()
 
     def compileStatements(self):
     # compila uma sequencia de Statements
@@ -176,7 +254,13 @@ class VMCompileEngine:
 
     def compileDo(self):
     # compila um Statement Do
-        return 0
+        result = ''
+        self.nextToken()
+        # result += self.compileSubRoutineCall()
+        result += self.esperado(';')
+        self.nextToken()
+        
+        return result
 
     def compileReturn(self):
     # compila um Statement Return
@@ -193,12 +277,11 @@ class VMCompileEngine:
     def compileExpression(self):
     # compila uma expressão
         result = self.compileTerm()
-        self.nextToken()
 
         while self.tokenC in self.op:
+            op = self.tokenC
             result = self.compileTerm()
-            result += 'op'
-            self.nextToken()
+            result += self.vm.writeArithmetic(op)
 
         return result
 
@@ -213,7 +296,6 @@ class VMCompileEngine:
             self.nextToken()
 
             if (self.tokenC == '['):
-                result += self.vm.writePush(self.vm.kindOf(id), self.vm.indexOf(id))
                 self.nextToken()
                 result += self.compileExpression()
                 self.nextToken()
@@ -221,15 +303,17 @@ class VMCompileEngine:
                 result += self.compileSubroutineDec(id)
             else:
                 result += self.vm.writePush(self.vm.kindOf(id), self.vm.indexOf(id))
+                self.nextToken()
         elif(self.tokenT == 'symbol'):
             if (self.tokenC == '('):
                 self.nextToken()
                 result += self.compileExpression()
                 self.nextToken()
-            elif (self.tokenC == '-' or self.tokenC == '~'):
-                result += self.vm.writeArithmetic(self.tokenC)
+            elif (self.tokenC in self.unaryOp):
+                unaryOP = self.tokenC
                 self.nextToken()
                 result += self.compileTerm()
+                result += self.vm.writeArithmetic(unaryOP)
 
         return result
 
