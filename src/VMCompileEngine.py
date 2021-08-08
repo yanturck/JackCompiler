@@ -1,3 +1,4 @@
+import re
 import VMCode as vm
 import JackTokenizer as lexer
 
@@ -20,6 +21,12 @@ class VMCompileEngine:
             self.tokenC = self.jt.getToken()
             self.tokenT = self.jt.tokenType(self.tokenC)
             self.tagToken = self.jt.tagToken(self.tokenC)
+    
+    def esperado(self, token):
+        if (self.tokenC == token):
+            return
+        else:
+            raise Exception('Valor Inesperado')
 
     def compile(self):
         self.nextToken()
@@ -53,19 +60,119 @@ class VMCompileEngine:
 
     def compileStatements(self):
     # compila uma sequencia de Statements
-        return 0
+        result = ''
+
+        if (self.tokenC == 'let'):
+            result += self.compileLet()
+            result += self.compileStatements()
+        elif (self.tokenC == 'if'):
+            result += self.compileIf()
+            result += self.compileStatements()
+        elif (self.tokenC == 'while'):
+            result += self.compileWhile()
+            result += self.compileStatements()
+        elif (self.tokenC == 'do'):
+            result += self.compileDo()
+            result += self.compileStatements()
+        elif (self.tokenC == 'return'):
+            result += self.compileReturn()
+            result += self.compileStatements()
+
+        return result
 
     def compileLet(self):
     # compila um Statement Let
-        return 0
+        result = ''
+
+        self.nextToken() # tokenC = identificador
+        id = self.tokenC
+        self.nextToken()
+
+        if (self.tokenC == '['):
+            self.nextToken()
+            result += self.compileExpression()
+            self.esperado(']') # tokenC = ]
+            self.nextToken()
+
+        self.esperado('=') # tokenC = =
+        self.nextToken()
+        result += self.compileExpression()
+        self.esperado(';') # tokenC = =
+        self.nextToken()
+
+        result += self.vm.writePop(self.vm.kindOf(id), self.vm.indexOf(id))
+        
+        return result
 
     def compileIf(self):
     # compila um Statement If
-        return 0
+        result = ''
+        self.nextToken()
+
+        label1 = 'IF_TRUE'
+        label2 = 'IF_FALSE'
+        label3 = 'IF_END'
+
+        self.esperado('(')
+        self.nextToken()
+        result += self.compileExpression()
+        self.esperado(')')
+        self.nextToken()
+        
+        result += self.vm.writeIf(label1) # if-goto L1
+        result += self.vm.writeGoto(label2) # goto L2
+        result += self.vm.writeLabel(label1) # L1
+
+        self.esperado('{')
+        self.nextToken()
+        result += self.compileStatements()
+        self.esperado('}')
+        self.nextToken()
+        
+        result += self.vm.writeGoto(label3) # goto END
+        result += self.vm.writeLabel(label2) # L2
+
+        self.esperado('else')
+        self.nextToken()
+        self.esperado('{')
+        self.nextToken()
+        result += self.compileStatements()
+        self.esperado('}')
+        self.nextToken()
+
+        result += self.vm.writeLabel(label2) # L END
+
+        return result
 
     def compileWhile(self):
     # compila um Statement While
-        return 0
+        result = ''
+
+        label1 = 'WHILE_EXP'
+        label2 = 'WHILE_END'
+
+        result += self.vm.writeLabel(label1) # L WHILE EXP
+
+        self.nextToken()
+        self.esperado('(')
+        self.nextToken()
+        result += self.compileExpression()
+        self.esperado(')')
+
+        result += self.vm.writeArithmetic('!')
+        result += self.vm.writeIf(label2) # if-goto WHILE END
+
+        self.nextToken()
+        result += self.esperado('{')
+        self.nextToken()
+        result += self.compileStatements()
+        result += self.esperado('}')
+        self.nextToken()
+
+        result += self.vm.writeGoto(label1) # goto WHILE EXP
+        result += self.vm.writeLabel(label2) # L WHILE END
+
+        return result
 
     def compileDo(self):
     # compila um Statement Do
