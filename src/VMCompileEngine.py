@@ -1,5 +1,4 @@
-from _typeshed import Self
-import re
+from typing import TextIO
 import VMCode as vm
 import JackTokenizer as lexer
 
@@ -12,8 +11,8 @@ class VMCompileEngine:
         self.unaryOp = ['-', '~']
 
         self.tokenC = ''
-        self.tagToken = ''
         self.tokenT = ''
+        self.className = ''
 
 
     def nextToken(self):
@@ -21,11 +20,10 @@ class VMCompileEngine:
             self.jt.advance()
             self.tokenC = self.jt.getToken()
             self.tokenT = self.jt.tokenType(self.tokenC)
-            self.tagToken = self.jt.tagToken(self.tokenC)
     
     def esperado(self, token):
         if (self.tokenC == token):
-            return
+            pass
         else:
             raise Exception('Valor Inesperado')
 
@@ -37,11 +35,13 @@ class VMCompileEngine:
     # compila uma classe completa
         self.esperado('class')
         self.nextToken() # tokenC = identificador da classe
+        self.className = self.tokenC
         self.nextToken()
         self.esperado('{')
         self.nextToken()
         self.vm.nivel = True # nivel de classe
         self.compileClassVarDec()
+        self.vm.nivel = False # Nivel de SubRoutine
         result = self.compileSubroutineDec()
         self.esperado('}')
         return result
@@ -53,15 +53,15 @@ class VMCompileEngine:
         if self.tokenC in vars:
             kind = self.tokenC
             self.nextToken()
-            tipo = self.tokenC() # type
+            tipo = self.tokenC # type
             self.nextToken()
-            name = self.tokenC() # identificador
+            name = self.tokenC # identificador
             self.nextToken()
             self.vm.define(name, tipo, kind)
 
             while (self.tokenC == ','):
                 self.nextToken()
-                name = self.tokenC() # identificador
+                name = self.tokenC # identificador
                 self.nextToken()
                 self.vm.define(name, tipo, kind)
             
@@ -75,16 +75,15 @@ class VMCompileEngine:
         subRoutines = ['constructor', 'function', 'method']
 
         if self.tokenC in subRoutines:
-            self.vm.nivel = False # Nivel de SubRoutine
+            self.vm.startSubRoutine()
             # tokenC = subRoutines
             self.nextToken() # tokenC = tipo
-            result += self.tagToken
             self.nextToken()
-            result += self.tagToken # identificador
+            result += 'function ' + self.className + '.' + self.tokenC + '\n'# + ' ' + str(self.vm.indexOf(self.tokenC))
             self.nextToken()
             self.esperado('(')
             self.nextToken()
-            result += self.compileParameterList()
+            self.compileParameterList()
             self.esperado(')')
             self.nextToken()
             result += self.compileSubroutineBody()
@@ -120,15 +119,15 @@ class VMCompileEngine:
     # compila uma declaração de variavel
         if (self.tokenC == 'var'):
             self.nextToken()
-            tipo = self.tokenC() # type
+            tipo = self.tokenC # type
             self.nextToken()
-            name = self.tokenC() # identificador
+            name = self.tokenC # identificador
             self.nextToken()
             self.vm.define(name, tipo, 'local')
 
             while (self.tokenC == ','):
                 self.nextToken()
-                name = self.tokenC() # identificador
+                name = self.tokenC # identificador
                 self.nextToken()
                 self.vm.define(name, tipo, 'local')
             
@@ -175,7 +174,7 @@ class VMCompileEngine:
         self.esperado('=') # tokenC = =
         self.nextToken()
         result += self.compileExpression()
-        self.esperado(';') # tokenC = =
+        self.esperado(';') # tokenC = ;
         self.nextToken()
 
         result += self.vm.writePop(self.vm.kindOf(id), self.vm.indexOf(id))
@@ -241,10 +240,10 @@ class VMCompileEngine:
         result += self.vm.writeIf(label2) # if-goto WHILE END
 
         self.nextToken()
-        result += self.esperado('{')
+        self.esperado('{')
         self.nextToken()
         result += self.compileStatements()
-        result += self.esperado('}')
+        self.esperado('}')
         self.nextToken()
 
         result += self.vm.writeGoto(label1) # goto WHILE EXP
@@ -280,7 +279,8 @@ class VMCompileEngine:
 
         while self.tokenC in self.op:
             op = self.tokenC
-            result = self.compileTerm()
+            self.nextToken()
+            result += self.compileTerm()
             result += self.vm.writeArithmetic(op)
 
         return result
@@ -289,7 +289,7 @@ class VMCompileEngine:
         result = ''
 
         if (self.tokenT == 'integerConstant'):
-            result += self.vm.writePush(self.vm.kindOf(self.tokenC), self.vm.indexOf(self.tokenC))
+            result += self.vm.writePush('constant', self.tokenC)
             self.nextToken()
         elif (self.tokenT == 'identifier'):
             id = self.tokenC
@@ -303,7 +303,6 @@ class VMCompileEngine:
                 result += self.compileSubroutineDec(id)
             else:
                 result += self.vm.writePush(self.vm.kindOf(id), self.vm.indexOf(id))
-                self.nextToken()
         elif(self.tokenT == 'symbol'):
             if (self.tokenC == '('):
                 self.nextToken()
@@ -330,5 +329,23 @@ class VMCompileEngine:
 
             return result
 
-test = VMCompileEngine()
-test.compileClass()
+test = VMCompileEngine("""// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/11/Average/Main.jack
+
+// (Same as projects/09/Average/Main.jack)
+
+// Inputs some numbers and computes their average
+class Main {
+   function void main() {
+     var int i;
+     
+     let i = 0;
+     while (i < 10) {
+        let i = i + 1;
+     }
+     return;
+   }
+}""")
+print(test.compile())

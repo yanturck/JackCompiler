@@ -20,7 +20,10 @@ class VMCode():
             'kind': kind,
             'index': self.varCount(kind)
         }
-        return symbol
+        if (self.nivel == True):
+            self.tableSymbolClass.append(symbol)
+        else:
+            self.tableSymbolSR.append(symbol)
 
     def varCount(self, kind): # kind = STATIC, FIELD, ARG ou VAR
     # retorna o número de variaveis do kind dado já definido no escopo corrente
@@ -86,62 +89,60 @@ class VMCode():
     # VMWriter =====================================================
     def writePush(self, segment, index): # segment = CONST, ARG, LOCAL, STATIC, THIS, THAT, POINTER, TEMP; index = Int
     # escreve um comando VM push
-        result = 'push' + segment + index
-        return result
+        return 'push ' + segment + ' ' + str(index) + '\n'
 
     def writePop(self, segment, index): # segment = CONST, ARG, LOCAL, STATIC, THIS, THAT, POINTER, TEMP; index = Int
     # escreve um comando VM pop
-        result = 'pop' + segment + index
-        return result
+        return 'pop ' + segment + ' ' + str(index) + '\n'
 
     def writeArithmetic(self, command): # command = ADD, SUB, NEG, EQ, GT, LT, AND, OR, NOT
     # escreve um comando VM lógico aritmético
         result = None
 
         if (command == '+'):
-            result = 'add'
+            result = 'add\n'
         elif (command == '-'):
-            result = 'sub'
+            result = 'sub\n'
         elif (command == '~'): # ainda não sei
-            result = 'neg'
+            result = 'neg\n'
         elif (command == '=='):
-            result = 'eq'
+            result = 'eq\n'
         elif (command == '>'):
-            result = 'gt'
+            result = 'gt\n'
         elif (command == '<'):
-            result = 'lt'
+            result = 'lt\n'
         elif (command == '&'):
-            result = 'and'
+            result = 'and\n'
         elif (command == '|'):
-            result = 'or'
+            result = 'or\n'
         elif (command == '!'):
-            result = 'not'
+            result = 'not\n'
         
         return result
     
     def writeLabel(self, label):
     # escreve um comando VM label
-        return 'label ' + label
+        return 'label ' + label + '\n'
 
     def writeGoto(self, label):
     # escreve um comando VM goto
-        return 'goto ' + label
+        return 'goto ' + label + '\n'
     
     def writeIf(self, label):
     # escreve um comando VM if-goto
-        return 'if-goto ' + label
+        return 'if-goto ' + label + '\n'
 
     def writeCall(self, name, nArgs): # name = String, nArgs = Int
     # escreve um comando VM call
-        return 'call ' + name + str(nArgs)
+        return 'call ' + name + ' ' + str(nArgs) + '\n'
 
     def writeFunction(self, name, nLocals): # name = String, nLocals = Int
     # escreve um comando VM function
-        return 'function ' + name + str(nLocals)
+        return 'function ' + name + ' ' + str(nLocals) + '\n'
 
     def writeReturn(self):
     # escreve um comando VM return
-        return 'return'
+        return 'return\n'
 
     # def close():
     # # fecha o arquivo de saída
