@@ -53,6 +53,10 @@ class VMCode():
             for i in self.tableSymbolSR:
                 if (name == i['name']):
                     kind = i['kind']
+            if (kind == None):
+                for i in self.tableSymbolClass:
+                    if (name == i['name']):
+                        kind = i['kind']
 
         return kind # retorna um STATIC, FIELD, ARG, VAR ou NONE
 
@@ -68,6 +72,10 @@ class VMCode():
             for i in self.tableSymbolSR:
                 if (name == i['name']):
                     tipo = i['type']
+            if (tipo == None):
+                for i in self.tableSymbolClass:
+                    if (name == i['name']):
+                        tipo = i['type']
 
         return tipo # retorna uma String
     
@@ -83,6 +91,10 @@ class VMCode():
             for i in self.tableSymbolSR:
                 if (name == i['name']):
                     ind = i['index']
+            if (ind == None):
+                for i in self.tableSymbolClass:
+                    if (name == i['name']):
+                        ind = i['index']
 
         return ind # retorna um inteiro
 
