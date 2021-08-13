@@ -7,16 +7,17 @@ class VMCompileEngine:
         self.vm = vm.VMCode()
         self.jt = lexer.JackTokenizer(fname)
         
-        self.op = ['+', '-', '*', '/', '&', '|', '<', '>', '=']
+        self.op = ['+', '-', '*', '/', '&', '|', '<', '>', '=', ',']
         self.unaryOp = ['-', '~']
 
         self.tokenC = ''
         self.tokenT = ''
         self.className = ''
         self.auxClassName = ''
+        self.subroutineName = ''
 
         self.countArg = 0
-        self.countMethod = 0
+        # self.countMethod = 0
 
 
     def nextToken(self):
@@ -84,7 +85,7 @@ class VMCompileEngine:
             subRoutine = self.tokenC
             self.nextToken() # tokenC = tipo
             self.nextToken()
-            result += 'function ' + self.className + '.' + self.tokenC + ' ' + str(self.countMethod) + '\n'
+            self.subroutineName = self.tokenC
             self.nextToken()
             self.esperado('(')
             self.nextToken()
@@ -99,7 +100,7 @@ class VMCompileEngine:
                 result += self.vm.writePop('pointer', 0)
 
             result += self.compileSubroutineBody()
-            self.countMethod += 1
+            # self.countMethod += 1
             result += self.compileSubroutineDec()
             
         return result
@@ -118,13 +119,29 @@ class VMCompileEngine:
             self.vm.define(name, tipo, 'argument')
             self.nextToken()
             self.compileParameterList()
+        elif(self.tokenT == 'identifier'):
+            tipo = self.tokenC
+            self.nextToken()
+            name = self.tokenC
+            self.vm.define(name, tipo, 'argument')
+            self.nextToken()
+            self.compileParameterList()
 
     def compileSubroutineBody(self):
     # compila um corpo de subroutina
         self.esperado('{')
         self.nextToken()
         self.compileVarDec()
-        result = self.compileStatements()
+
+        count = 0
+        for i in self.vm.tableSymbolSR:
+            if ('local' == i['kind']):
+                count += 1
+                
+        result = 'function ' + self.className + '.' + self.subroutineName + ' ' + str(count) + '\n'
+        # print(self.tokenC)
+        result += self.compileStatements()
+        # print(self.tokenC)
         self.esperado('}')
         self.nextToken()
         return result
@@ -174,26 +191,40 @@ class VMCompileEngine:
     def compileLet(self):
     # compila um Statement Let
         result = ''
+        array = False
+        temp = 0
 
         self.nextToken() # tokenC = identificador
         id = self.tokenC
         self.nextToken()
 
         if (self.tokenC == '['):
+            array = True
             self.nextToken()
             result += self.compileExpression()
             self.esperado(']') # tokenC = ]
+            result += self.vm.writePush(self.vm.kindOf(id), self.vm.indexOf(id))
+            result += self.vm.writeArithmetic('+')
             self.nextToken()
 
         self.esperado('=') # tokenC = =
         self.nextToken()
+        # print(self.tokenC)
         result += self.compileExpression()
         # print(result)
         # print(self.tokenC)
         self.esperado(';') # tokenC = ;
         self.nextToken()
 
-        result += self.vm.writePop(self.vm.kindOf(id), self.vm.indexOf(id))
+        if (array == True):
+            result += self.vm.writePop('temp', temp)
+            result += self.vm.writePop('pointer', 1)
+            result += self.vm.writePush('temp', temp)
+            result += self.vm.writePop('that', 0)
+            # result += self.vm.writePush('constant', 0)
+            temp += 1
+        else:
+            result += self.vm.writePop(self.vm.kindOf(id), self.vm.indexOf(id))
         
         return result
 
@@ -202,9 +233,9 @@ class VMCompileEngine:
         result = ''
         self.nextToken()
 
-        label1 = 'IF_TRUE'
-        label2 = 'IF_FALSE'
-        label3 = 'IF_END'
+        label1 = 'IF_TRUE0'
+        label2 = 'IF_FALSE0'
+        label3 = 'IF_END0'
 
         self.esperado('(')
         self.nextToken()
@@ -221,17 +252,17 @@ class VMCompileEngine:
         result += self.compileStatements()
         self.esperado('}')
         self.nextToken()
-        
-        result += self.vm.writeGoto(label3) # goto END
-        result += self.vm.writeLabel(label2) # L2
 
-        self.esperado('else')
-        self.nextToken()
-        self.esperado('{')
-        self.nextToken()
-        result += self.compileStatements()
-        self.esperado('}')
-        self.nextToken()
+        if (self.tokenC == 'else'):
+            result += self.vm.writeGoto(label3) # goto END
+            result += self.vm.writeLabel(label2) # L2
+
+            self.nextToken()
+            self.esperado('{')
+            self.nextToken()
+            result += self.compileStatements()
+            self.esperado('}')
+            self.nextToken()
 
         result += self.vm.writeLabel(label2) # L END
 
@@ -241,8 +272,8 @@ class VMCompileEngine:
     # compila um Statement While
         result = ''
 
-        label1 = 'WHILE_EXP'
-        label2 = 'WHILE_END'
+        label1 = 'WHILE_EXP0'
+        label2 = 'WHILE_END0'
 
         result += self.vm.writeLabel(label1) # L WHILE EXP
 
@@ -269,11 +300,13 @@ class VMCompileEngine:
 
     def compileDo(self):
     # compila um Statement Do
-        result = ''
         self.nextToken()
-        # result += self.compileSubRoutineCall()
-        result += self.esperado(';')
+        result = self.compileExpression()
+        # print(result)
+        # print(self.tokenC)
+        self.esperado(';')
         self.nextToken()
+        result += self.vm.writePop('temp', 0)
         
         return result
 
@@ -284,16 +317,20 @@ class VMCompileEngine:
 
         if (self.tokenC != ';'):
             result += self.compileExpression()
+            self.nextToken()
         else:
             self.nextToken()
         
+        if ('return' not in self.jt.tokens):
+            result += self.vm.writePush('constant', 0)
+
         result += self.vm.writeReturn()
-        self.nextToken()
         return result
 
     def compileExpression(self):
     # compila uma expressão
         result = self.compileTerm()
+        # self.nextToken()
 
         while self.tokenC in self.op:
             op = self.tokenC
@@ -301,7 +338,11 @@ class VMCompileEngine:
             result += self.compileTerm()
 
             if (op == '*'):
-                result += self.vm.writeCall('Marh.multiply', 2)
+                result += self.vm.writeCall('Math.multiply', 2)
+            elif (op == '/'):
+                result += self.vm.writeCall('Math.divide', 2)
+            elif (op == ','):
+                result += self.compileExpressionList()
             else:
                 result += self.vm.writeArithmetic(op)
 
@@ -321,6 +362,12 @@ class VMCompileEngine:
                 self.nextToken()
                 result += self.compileExpression()
                 self.nextToken()
+
+                result += self.vm.writePush(self.vm.kindOf(id), self.vm.indexOf(id))
+                result += self.vm.writeArithmetic('+')
+                result += self.vm.writePop('pointer', 1)
+                result += self.vm.writePush('that', 0)
+
             elif (self.tokenC == '.'):
                 self.nextToken()
                 self.auxClassName = id
@@ -329,13 +376,13 @@ class VMCompileEngine:
                 self.nextToken()
                 self.countArg = 0
                 result += self.compileExpressionList()
-                result += self.vm.writeCall(self.auxClassName+'.'+id, self.countArg)
                 self.nextToken()
+                result += self.vm.writeCall(self.auxClassName+'.'+id, self.countArg)
             else:
                 result += self.vm.writePush(self.vm.kindOf(id), self.vm.indexOf(id))
         elif (self.tokenT == 'stringConst'):
-            string = self.tokenC[1:-1]
-            result += self.vm.writePush('constant', len(string)) # por conta das ""
+            string = self.tokenC[1:-1] # removendo as ""
+            result += self.vm.writePush('constant', len(string))
             result += self.vm.writeCall('String.new', 1)
 
             for i in string:
@@ -346,8 +393,15 @@ class VMCompileEngine:
         elif(self.tokenT == 'symbol'):
             if (self.tokenC == '('):
                 self.nextToken()
-                result += self.compileExpressionList()
-                self.nextToken()
+                if (self.tokenC == '('):
+                    self.nextToken()
+                    result += self.compileExpression()
+                    self.nextToken()
+                else:
+                    self.nextToken()
+                    self.countArg = 0
+                    result += self.compileExpressionList()
+                    self.nextToken()
             elif (self.tokenC in self.unaryOp):
                 unaryOP = self.tokenC
                 self.nextToken()
@@ -358,16 +412,21 @@ class VMCompileEngine:
                 result += self.vm.writePush('pointer', 0)
                 self.nextToken()
                 self.nextToken()
+            else:
+                self.nextToken()
 
         return result
 
     def compileExpressionList(self):
     # compila uma lista de expressão
         if (self.tokenC == ')'):
+            # self.nextToken()
             return ''
         else:
             self.countArg += 1
             result = self.compileExpression()
+            # self.nextToken()
+            # print(self.tokenC)
 
             if (self.tokenC == ','):
                 self.nextToken()
@@ -375,75 +434,145 @@ class VMCompileEngine:
 
             return result
 
-test = VMCompileEngine("""// This file is part of www.nand2tetris.org
+test = VMCompileEngine("""
+// This file is part of www.nand2tetris.org
 // and the book "The Elements of Computing Systems"
 // by Nisan and Schocken, MIT Press.
-// File name: projects/11/ComplexArrays/Main.jack
+// File name: projects/11/Pong/PongGame.jack
 
 /**
- * Performs several complex array processing tests.
- * For each test, the expected result is printed, along with the
- * actual result. In each test, the two results should be equal.
+ * Represents a Pong game.
  */
-class Main {
+class PongGame {
 
-    function void main() {
-        var Array a, b, c;
-        
-        let a = Array.new(10);
-        let b = Array.new(5);
-        let c = Array.new(1);
-        
-        let a[3] = 2;
-        let a[4] = 8;
-        let a[5] = 4;
-        let b[a[3]] = a[3] + 3;  // b[2] = 5
-        let a[b[a[3]]] = a[a[5]] * b[((7 - a[3]) - Main.double(2)) + 1];  // a[5] = 8 * 5 = 40
-        let c[0] = null;
-        let c = c[0];
-        
-        do Output.printString("Test 1: expected result: 5; actual result: ");
-        do Output.printInt(b[2]);
-        do Output.println();
-        do Output.printString("Test 2: expected result: 40; actual result: ");
-        do Output.printInt(a[5]);
-        do Output.println();
-        do Output.printString("Test 3: expected result: 0; actual result: ");
-        do Output.printInt(c);
-        do Output.println();
-        
-        let c = null;
+    static PongGame instance; // the singelton, a Pong game instance     
+    field Bat bat;            // the bat
+    field Ball ball;          // the ball
+    field int wall;           // the current wall that the ball is bouncing off of.
+    field boolean exit;       // true when the game is over
+    field int score;          // the current score.
+    field int lastWall;       // the last wall that the ball bounced off of.
 
-        if (c = null) {
-            do Main.fill(a, 10);
-            let c = a[3];
-            let c[1] = 33;
-            let c = a[7];
-            let c[1] = 77;
-            let b = a[3];
-            let b[1] = b[1] + c[1];  // b[1] = 33 + 77 = 110;
-        }
+    // The current width of the bat
+    field int batWidth;
 
-        do Output.printString("Test 4: expected result: 77; actual result: ");
-        do Output.printInt(c[1]);
-        do Output.println();
-        do Output.printString("Test 5: expected result: 110; actual result: ");
-        do Output.printInt(b[1]);
-        do Output.println();
+    /** Constructs a new Pong game. */
+    constructor PongGame new() {
+	    do Screen.clearScreen();
+        let batWidth = 50;  // initial bat size
+        let bat = Bat.new(230, 229, batWidth, 7);
+        let ball = Ball.new(253, 222, 0, 511, 0, 229);
+        do ball.setDestination(400,0);
+        do Screen.drawRectangle(0, 238, 511, 240);
+	    do Output.moveCursor(22,0);
+	    do Output.printString("Score: 0");
+	
+	    let exit = false;
+	    let score = 0;
+	    let wall = 0;
+	    let lastWall = 0;
+
+        return this;
+    }
+
+    /** Deallocates the object's memory. */
+    method void dispose() {
+        do bat.dispose();
+	    do ball.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /** Creates an instance of Pong game, and stores it. */
+    function void newInstance() {
+        let instance = PongGame.new();
         return;
     }
     
-    function int double(int a) {
-    	return a * 2;
+    /** Returns the single instance of this Pong game. */
+    function PongGame getInstance() {
+        return instance;
     }
-    
-    function void fill(Array a, int size) {
-        while (size > 0) {
-            let size = size - 1;
-            let a[size] = Array.new(3);
+
+    /** Starts the game, and andles inputs from the user that control
+     *  the bat's movement direction. */
+    method void run() {
+        var char key;
+
+        while (~exit) {
+            // waits for a key to be pressed.
+            while ((key = 0) & (~exit)) {
+                let key = Keyboard.keyPressed();
+                do bat.move();
+                do moveBall();
+                do Sys.wait(50);
+            }
+
+            if (key = 130) { do bat.setDirection(1); }
+	        else {
+	            if (key = 132) { do bat.setDirection(2); }
+		        else {
+                    if (key = 140) { let exit = true; }
+		        }
+            }
+
+            // Waits for the key to be released.
+            while ((~(key = 0)) & (~exit)) {
+                let key = Keyboard.keyPressed();
+                do bat.move();
+                do moveBall();
+                do Sys.wait(50);
+            }
+        }
+
+	    if (exit) {
+            do Output.moveCursor(10,27);
+	        do Output.printString("Game Over");
+	    }
+            
+        return;
+    }
+
+    /**
+     * Handles ball movement, including bouncing.
+     * If the ball bounces off a wall, finds its new direction.
+     * If the ball bounces off the bat, increases the score by one
+     * and shrinks the bat's size, to make the game more challenging. 
+     */
+    method void moveBall() {
+        var int bouncingDirection, batLeft, batRight, ballLeft, ballRight;
+
+        let wall = ball.move();
+
+        if ((wall > 0) & (~(wall = lastWall))) {
+            let lastWall = wall;
+            let bouncingDirection = 0;
+            let batLeft = bat.getLeft();
+            let batRight = bat.getRight();
+            let ballLeft = ball.getLeft();
+            let ballRight = ball.getRight();
+  
+            if (wall = 4) {
+                let exit = (batLeft > ballRight) | (batRight < ballLeft);
+                if (~exit) {
+                    if (ballRight < (batLeft + 10)) { let bouncingDirection = -1; }
+                    else {
+                        if (ballLeft > (batRight - 10)) { let bouncingDirection = 1; }
+                    }
+
+                    let batWidth = batWidth - 2;
+                    do bat.setWidth(batWidth);      
+                    let score = score + 1;
+                    do Output.moveCursor(22,7);
+                    do Output.printInt(score);
+                }
+            }
+            do ball.bounce(bouncingDirection);
         }
         return;
     }
 }
 """)
+
 print(test.compile())
+# test.compile()

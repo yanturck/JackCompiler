@@ -117,7 +117,7 @@ class VMCode():
             result = 'sub\n'
         elif (command == '~'): # ainda não sei
             result = 'neg\n'
-        elif (command == '=='):
+        elif (command == '='):
             result = 'eq\n'
         elif (command == '>'):
             result = 'gt\n'
