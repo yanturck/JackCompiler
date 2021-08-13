@@ -115,7 +115,7 @@ class VMCode():
             result = 'add\n'
         elif (command == '-'):
             result = 'sub\n'
-        elif (command == '~'): # ainda não sei
+        elif (command == 'neg'): # ainda não sei
             result = 'neg\n'
         elif (command == '='):
             result = 'eq\n'
@@ -127,7 +127,7 @@ class VMCode():
             result = 'and\n'
         elif (command == '|'):
             result = 'or\n'
-        elif (command == '!'):
+        elif (command == '~'):
             result = 'not\n'
         
         return result

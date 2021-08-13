@@ -7,7 +7,7 @@ class VMCompileEngine:
         self.vm = vm.VMCode()
         self.jt = lexer.JackTokenizer(fname)
         
-        self.op = ['+', '-', '*', '/', '&', '|', '<', '>', '=', ',']
+        self.op = ['+', '-', '*', '/', '&', '|', '<', '>', '=']
         self.unaryOp = ['-', '~']
 
         self.tokenC = ''
@@ -17,7 +17,8 @@ class VMCompileEngine:
         self.subroutineName = ''
 
         self.countArg = 0
-        # self.countMethod = 0
+        self.countWhile = 0
+        self.countIf = 0
 
 
     def nextToken(self):
@@ -101,6 +102,7 @@ class VMCompileEngine:
 
             result += self.compileSubroutineBody()
             # self.countMethod += 1
+            # print(self.tokenC)
             result += self.compileSubroutineDec()
             
         return result
@@ -196,6 +198,7 @@ class VMCompileEngine:
 
         self.nextToken() # tokenC = identificador
         id = self.tokenC
+        # print(id)
         self.nextToken()
 
         if (self.tokenC == '['):
@@ -232,16 +235,17 @@ class VMCompileEngine:
     # compila um Statement If
         result = ''
         self.nextToken()
-
-        label1 = 'IF_TRUE0'
-        label2 = 'IF_FALSE0'
-        label3 = 'IF_END0'
+        
+        label1 = 'IF_TRUE' + str(self.countIf)
+        label2 = 'IF_FALSE' + str(self.countIf)
+        label3 = 'IF_END'+ str(self.countIf)
 
         self.esperado('(')
         self.nextToken()
         result += self.compileExpression()
         self.esperado(')')
         self.nextToken()
+        # print(self.tokenC)
         
         result += self.vm.writeIf(label1) # if-goto L1
         result += self.vm.writeGoto(label2) # goto L2
@@ -249,7 +253,9 @@ class VMCompileEngine:
 
         self.esperado('{')
         self.nextToken()
+        self.countIf += 1
         result += self.compileStatements()
+        self.countIf = self.countIf - 1
         self.esperado('}')
         self.nextToken()
 
@@ -272,18 +278,20 @@ class VMCompileEngine:
     # compila um Statement While
         result = ''
 
-        label1 = 'WHILE_EXP0'
-        label2 = 'WHILE_END0'
+        label1 = 'WHILE_EXP' + str(self.countWhile)
+        label2 = 'WHILE_END' + str(self.countWhile)
 
         result += self.vm.writeLabel(label1) # L WHILE EXP
 
         self.nextToken()
         self.esperado('(')
         self.nextToken()
+        self.countWhile += 1
         result += self.compileExpression()
+        self.countWhile = self.countWhile - 1
         self.esperado(')')
 
-        result += self.vm.writeArithmetic('!')
+        result += self.vm.writeArithmetic('~')
         result += self.vm.writeIf(label2) # if-goto WHILE END
 
         self.nextToken()
@@ -320,8 +328,6 @@ class VMCompileEngine:
             self.nextToken()
         else:
             self.nextToken()
-        
-        if ('return' not in self.jt.tokens):
             result += self.vm.writePush('constant', 0)
 
         result += self.vm.writeReturn()
@@ -341,8 +347,8 @@ class VMCompileEngine:
                 result += self.vm.writeCall('Math.multiply', 2)
             elif (op == '/'):
                 result += self.vm.writeCall('Math.divide', 2)
-            elif (op == ','):
-                result += self.compileExpressionList()
+            # elif (op == ','):
+            #     result += self.compileExpressionList()
             else:
                 result += self.vm.writeArithmetic(op)
 
@@ -376,6 +382,7 @@ class VMCompileEngine:
                 self.nextToken()
                 self.countArg = 0
                 result += self.compileExpressionList()
+                self.esperado(')')
                 self.nextToken()
                 result += self.vm.writeCall(self.auxClassName+'.'+id, self.countArg)
             else:
@@ -393,15 +400,17 @@ class VMCompileEngine:
         elif(self.tokenT == 'symbol'):
             if (self.tokenC == '('):
                 self.nextToken()
-                if (self.tokenC == '('):
-                    self.nextToken()
-                    result += self.compileExpression()
-                    self.nextToken()
-                else:
-                    self.nextToken()
-                    self.countArg = 0
-                    result += self.compileExpressionList()
-                    self.nextToken()
+                # if (self.tokenC == '('):
+                #     self.nextToken()
+                #     result += self.compileExpression()
+                #     self.nextToken()
+                # else:
+                #     self.countArg = 0
+                #     result += self.compileExpressionList()
+                #     self.nextToken()
+                result += self.compileExpression()
+                self.esperado(')')
+                self.nextToken()
             elif (self.tokenC in self.unaryOp):
                 unaryOP = self.tokenC
                 self.nextToken()
@@ -411,6 +420,15 @@ class VMCompileEngine:
             if (self.tokenC == 'this'):
                 result += self.vm.writePush('pointer', 0)
                 self.nextToken()
+            elif (self.tokenC == 'null'):
+                result += self.vm.writePush('constant', 0)
+                self.nextToken()
+            elif (self.tokenC == 'true'):
+                result += self.vm.writePush('constant', 0)
+                result += self.vm.writeArithmetic('~')
+                self.nextToken()
+            elif (self.tokenC == 'false'):
+                result += self.vm.writePush('constant', 0)
                 self.nextToken()
             else:
                 self.nextToken()
@@ -430,7 +448,16 @@ class VMCompileEngine:
 
             if (self.tokenC == ','):
                 self.nextToken()
+                if (self.tokenC == '-'):
+                    self.nextToken()
+                    result += self.compileExpressionList()
+                    result += self.vm.writeArithmetic('neg')
+                else:
+                    result += self.compileExpressionList()
+            elif (self.tokenC == '-'):
+                self.nextToken()
                 result += self.compileExpressionList()
+                result += self.vm.writeArithmetic('neg')
 
             return result
 
