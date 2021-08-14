@@ -1,18 +1,17 @@
-import JackTokenizer as lexer
-import CompilationEngine as eng
+import VMCompileEngine as vm
 import os
 
 class JackCompiler:
     def __init__(self):
-        self.caminhos = [os.path.join('/home/yan/Documentos/Compiladores/nand2tetris/projects/10/ExpressionLessSquare/Testes', nome) for nome in os.listdir('/home/yan/Documentos/Compiladores/nand2tetris/projects/10/ExpressionLessSquare')]
+        self.caminhos = [os.path.join('/home/yan/Documentos/Compiladores/nand2tetris/projects/11/Average', nome) for nome in os.listdir('/home/yan/Documentos/Compiladores/nand2tetris/projects/11/Average')]
         self.arqJack = [arq for arq in self.caminhos if arq.lower().endswith(".jack")]
 
         while self.arqJack != []:
             fpath = self.arqJack.pop()
             fname = open(fpath, 'r')
-            sname = open(fpath[:-4] + 'xml', 'w')
+            vname = open(fpath[:-4] + 'vm', 'w')
 
-            sinta = eng.CompilationEngine(fname.read())
-            sname.write(sinta.compile())
+            vmcode = vm.VMCompileEngine(fname.read())
+            vname.write(vmcode.compile())
 
 JackCompiler()

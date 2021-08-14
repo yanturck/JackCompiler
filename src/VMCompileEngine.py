@@ -1,4 +1,3 @@
-from typing import TextIO
 import VMCode as vm
 import JackTokenizer as lexer
 
@@ -15,6 +14,7 @@ class VMCompileEngine:
         self.className = ''
         self.auxClassName = ''
         self.subroutineName = ''
+        self.subRoutine = ''
 
         self.countArg = 0
         self.countWhile = 0
@@ -82,8 +82,7 @@ class VMCompileEngine:
 
         if self.tokenC in subRoutines:
             self.vm.startSubRoutine()
-            # tokenC = subRoutines
-            subRoutine = self.tokenC
+            self.subRoutine = self.tokenC
             self.nextToken() # tokenC = tipo
             self.nextToken()
             self.subroutineName = self.tokenC
@@ -94,15 +93,7 @@ class VMCompileEngine:
             self.esperado(')')
             self.nextToken()
 
-            if (subRoutine == 'constructor'):
-                count = len(self.vm.tableSymbolSR)
-                result += self.vm.writePush('constant', count)
-                result += self.vm.writeCall('Memory.alloc', count-1)
-                result += self.vm.writePop('pointer', 0)
-
             result += self.compileSubroutineBody()
-            # self.countMethod += 1
-            # print(self.tokenC)
             result += self.compileSubroutineDec()
             
         return result
@@ -141,9 +132,23 @@ class VMCompileEngine:
                 count += 1
                 
         result = 'function ' + self.className + '.' + self.subroutineName + ' ' + str(count) + '\n'
-        # print(self.tokenC)
+
+        count = 0
+        for i in self.vm.tableSymbolClass:
+            if ('field' == i['kind']):
+                count += 1
+
+        if (self.subRoutine == 'constructor'):
+            self.vm.nivel = True # nivel de classe
+            result += self.vm.writePush('constant', count)
+            self.vm.nivel = False # Nivel de SubRoutine
+            result += self.vm.writeCall('Memory.alloc', 1)
+            result += self.vm.writePop('pointer', 0)
+        elif (self.subRoutine == 'method'):
+            result += self.vm.writePush('argument', 0)
+            result += self.vm.writePop('pointer', 0)
+
         result += self.compileStatements()
-        # print(self.tokenC)
         self.esperado('}')
         self.nextToken()
         return result
@@ -198,7 +203,6 @@ class VMCompileEngine:
 
         self.nextToken() # tokenC = identificador
         id = self.tokenC
-        # print(id)
         self.nextToken()
 
         if (self.tokenC == '['):
@@ -212,10 +216,7 @@ class VMCompileEngine:
 
         self.esperado('=') # tokenC = =
         self.nextToken()
-        # print(self.tokenC)
         result += self.compileExpression()
-        # print(result)
-        # print(self.tokenC)
         self.esperado(';') # tokenC = ;
         self.nextToken()
 
@@ -224,7 +225,6 @@ class VMCompileEngine:
             result += self.vm.writePop('pointer', 1)
             result += self.vm.writePush('temp', temp)
             result += self.vm.writePop('that', 0)
-            # result += self.vm.writePush('constant', 0)
             temp += 1
         else:
             result += self.vm.writePop(self.vm.kindOf(id), self.vm.indexOf(id))
@@ -245,7 +245,6 @@ class VMCompileEngine:
         result += self.compileExpression()
         self.esperado(')')
         self.nextToken()
-        # print(self.tokenC)
         
         result += self.vm.writeIf(label1) # if-goto L1
         result += self.vm.writeGoto(label2) # goto L2
@@ -270,7 +269,7 @@ class VMCompileEngine:
             self.esperado('}')
             self.nextToken()
 
-        result += self.vm.writeLabel(label2) # L END
+        result += self.vm.writeLabel(label3) # L END
 
         return result
 
@@ -309,9 +308,18 @@ class VMCompileEngine:
     def compileDo(self):
     # compila um Statement Do
         self.nextToken()
+        
+        aux = self.tokenC
+        self.nextToken()
+        if (self.tokenC != '.'):
+            self.auxClassName = self.className
+
+        self.jt.tokens.insert(0, self.tokenC)
+        self.jt.tokens.insert(0, aux)
+        self.nextToken()
+
+
         result = self.compileExpression()
-        # print(result)
-        # print(self.tokenC)
         self.esperado(';')
         self.nextToken()
         result += self.vm.writePop('temp', 0)
@@ -336,7 +344,6 @@ class VMCompileEngine:
     def compileExpression(self):
     # compila uma expressão
         result = self.compileTerm()
-        # self.nextToken()
 
         while self.tokenC in self.op:
             op = self.tokenC
@@ -347,8 +354,6 @@ class VMCompileEngine:
                 result += self.vm.writeCall('Math.multiply', 2)
             elif (op == '/'):
                 result += self.vm.writeCall('Math.divide', 2)
-            # elif (op == ','):
-            #     result += self.compileExpressionList()
             else:
                 result += self.vm.writeArithmetic(op)
 
@@ -400,14 +405,6 @@ class VMCompileEngine:
         elif(self.tokenT == 'symbol'):
             if (self.tokenC == '('):
                 self.nextToken()
-                # if (self.tokenC == '('):
-                #     self.nextToken()
-                #     result += self.compileExpression()
-                #     self.nextToken()
-                # else:
-                #     self.countArg = 0
-                #     result += self.compileExpressionList()
-                #     self.nextToken()
                 result += self.compileExpression()
                 self.esperado(')')
                 self.nextToken()
@@ -438,13 +435,10 @@ class VMCompileEngine:
     def compileExpressionList(self):
     # compila uma lista de expressão
         if (self.tokenC == ')'):
-            # self.nextToken()
             return ''
         else:
             self.countArg += 1
             result = self.compileExpression()
-            # self.nextToken()
-            # print(self.tokenC)
 
             if (self.tokenC == ','):
                 self.nextToken()
@@ -460,146 +454,3 @@ class VMCompileEngine:
                 result += self.vm.writeArithmetic('neg')
 
             return result
-
-test = VMCompileEngine("""
-// This file is part of www.nand2tetris.org
-// and the book "The Elements of Computing Systems"
-// by Nisan and Schocken, MIT Press.
-// File name: projects/11/Pong/PongGame.jack
-
-/**
- * Represents a Pong game.
- */
-class PongGame {
-
-    static PongGame instance; // the singelton, a Pong game instance     
-    field Bat bat;            // the bat
-    field Ball ball;          // the ball
-    field int wall;           // the current wall that the ball is bouncing off of.
-    field boolean exit;       // true when the game is over
-    field int score;          // the current score.
-    field int lastWall;       // the last wall that the ball bounced off of.
-
-    // The current width of the bat
-    field int batWidth;
-
-    /** Constructs a new Pong game. */
-    constructor PongGame new() {
-	    do Screen.clearScreen();
-        let batWidth = 50;  // initial bat size
-        let bat = Bat.new(230, 229, batWidth, 7);
-        let ball = Ball.new(253, 222, 0, 511, 0, 229);
-        do ball.setDestination(400,0);
-        do Screen.drawRectangle(0, 238, 511, 240);
-	    do Output.moveCursor(22,0);
-	    do Output.printString("Score: 0");
-	
-	    let exit = false;
-	    let score = 0;
-	    let wall = 0;
-	    let lastWall = 0;
-
-        return this;
-    }
-
-    /** Deallocates the object's memory. */
-    method void dispose() {
-        do bat.dispose();
-	    do ball.dispose();
-        do Memory.deAlloc(this);
-        return;
-    }
-
-    /** Creates an instance of Pong game, and stores it. */
-    function void newInstance() {
-        let instance = PongGame.new();
-        return;
-    }
-    
-    /** Returns the single instance of this Pong game. */
-    function PongGame getInstance() {
-        return instance;
-    }
-
-    /** Starts the game, and andles inputs from the user that control
-     *  the bat's movement direction. */
-    method void run() {
-        var char key;
-
-        while (~exit) {
-            // waits for a key to be pressed.
-            while ((key = 0) & (~exit)) {
-                let key = Keyboard.keyPressed();
-                do bat.move();
-                do moveBall();
-                do Sys.wait(50);
-            }
-
-            if (key = 130) { do bat.setDirection(1); }
-	        else {
-	            if (key = 132) { do bat.setDirection(2); }
-		        else {
-                    if (key = 140) { let exit = true; }
-		        }
-            }
-
-            // Waits for the key to be released.
-            while ((~(key = 0)) & (~exit)) {
-                let key = Keyboard.keyPressed();
-                do bat.move();
-                do moveBall();
-                do Sys.wait(50);
-            }
-        }
-
-	    if (exit) {
-            do Output.moveCursor(10,27);
-	        do Output.printString("Game Over");
-	    }
-            
-        return;
-    }
-
-    /**
-     * Handles ball movement, including bouncing.
-     * If the ball bounces off a wall, finds its new direction.
-     * If the ball bounces off the bat, increases the score by one
-     * and shrinks the bat's size, to make the game more challenging. 
-     */
-    method void moveBall() {
-        var int bouncingDirection, batLeft, batRight, ballLeft, ballRight;
-
-        let wall = ball.move();
-
-        if ((wall > 0) & (~(wall = lastWall))) {
-            let lastWall = wall;
-            let bouncingDirection = 0;
-            let batLeft = bat.getLeft();
-            let batRight = bat.getRight();
-            let ballLeft = ball.getLeft();
-            let ballRight = ball.getRight();
-  
-            if (wall = 4) {
-                let exit = (batLeft > ballRight) | (batRight < ballLeft);
-                if (~exit) {
-                    if (ballRight < (batLeft + 10)) { let bouncingDirection = -1; }
-                    else {
-                        if (ballLeft > (batRight - 10)) { let bouncingDirection = 1; }
-                    }
-
-                    let batWidth = batWidth - 2;
-                    do bat.setWidth(batWidth);      
-                    let score = score + 1;
-                    do Output.moveCursor(22,7);
-                    do Output.printInt(score);
-                }
-            }
-            do ball.bounce(bouncingDirection);
-        }
-        return;
-    }
-}
-""")
-
-print(test.compile())
-# test.compile()

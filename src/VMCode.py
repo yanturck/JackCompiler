@@ -56,7 +56,7 @@ class VMCode():
             if (kind == None):
                 for i in self.tableSymbolClass:
                     if (name == i['name']):
-                        kind = i['kind']
+                        kind = 'this'
 
         return kind # retorna um STATIC, FIELD, ARG, VAR ou NONE
 
